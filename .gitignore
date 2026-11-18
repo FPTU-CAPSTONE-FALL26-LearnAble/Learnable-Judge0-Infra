@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+judge0.conf
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.csr
+secrets/
+backups/
+artifacts/
+*.dump
+*.sql
+*.log
+__pycache__/
