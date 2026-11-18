@@ -1,5 +1,7 @@
 # Phạm vi và quy tắc vận hành
 
+- Commit và push thay đổi lên branch `dev` để người dùng review và tự merge vào `main`.
+- Commit message chỉ có summary, không thêm co-author trailer.
 - Chỉ quản lý hạ tầng Judge0 trong repository này. Giữ nghiệp vụ thi trong repository backend.
 - Mỗi cloud task đã có môi trường riêng. Dùng checkout hiện có, chỉ tạo Git worktree khi người dùng yêu cầu.
 - Trước thay đổi EC2, đọc tài liệu hiện trạng, khảo sát container, volume, OS, CPU architecture, RAM, disk, Docker/Compose và cgroups.
