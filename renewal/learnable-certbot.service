@@ -1,0 +1,11 @@
+[Unit]
+Description=Renew the LearnAble Judge0 IP certificate
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/certbot/bin/certbot renew --cert-name learnable-judge0-ip --quiet
+ExecStartPost=/usr/bin/cmp --silent /etc/letsencrypt/live/learnable-judge0-ip/fullchain.pem /opt/learnable-judge0/secrets/tls/server.crt
+TimeoutStartSec=30min
+PrivateTmp=true

@@ -35,19 +35,38 @@ Script tạo AUTHN_TOKEN, AUTHZ_TOKEN, SECRET_KEY_BASE, mật khẩu PostgreSQL/
 
 Healthcheck kiểm tra PostgreSQL, Redis và API có xác thực. Worker readiness cần submission kết thúc. Nếu sandbox/cgroups hoặc OOM lỗi, chẩn đoán và điều chỉnh theo release, giữ sandbox hoạt động.
 
-## HTTPS khi chưa có domain
+## Override mạng API
 
-Phương án demo là chứng chỉ IP SAN tự ký với trust riêng trên backend. Đây chưa phải public browser trust. Xác minh IP hiện tại trước tạo chứng chỉ. Thư mục TLS đích phải chưa tồn tại để tránh ghi đè.
+Nếu API cần routed bridge cho đường truy cập qua port localhost, dùng file `docker-compose.api-network.yml`. Ghi lựa chọn vào `.env` trên host để các script và renewal hook cùng dùng cấu hình đó.
+
+```dotenv
+COMPOSE_FILE=docker-compose.yml:docker-compose.api-network.yml
+```
+
+Override chỉ thêm mạng `api` cho server, giữ mạng `data` internal, port `127.0.0.1:2358`, network của worker và các cờ sandbox. Database/Redis giữ mạng internal và không publish port. API có thêm khả năng egress qua bridge này, cần review theo policy vận hành.
+
+Sau khi review cấu hình render bằng công cụ riêng tư, kiểm tra và cập nhật riêng server trong thời gian cho phép gián đoạn API.
 
 ```sh
-sudo bash scripts/create-demo-tls.sh 3.25.120.198 /opt/learnable-judge0/secrets/tls
+sudo docker compose config --quiet
+sudo docker compose up -d --no-deps --wait --wait-timeout 240 server
+sudo docker compose ps
+```
+
+Lệnh không yêu cầu xóa volume hoặc recreate database/Redis. Chạy lại auth và submission qua localhost/HTTPS sau cập nhật. Khi quay lui override, bỏ COMPOSE_FILE bổ sung trong `.env` và recreate server theo cách trên, giữ nguyên volume names.
+
+## HTTPS khi chưa có domain
+
+Chủ máy đã cấp chứng chỉ Let's Encrypt thật cho IP `3.25.120.198` và đặt bản Nginx sử dụng tại TLS_DIR. Giữ nguyên hai file `server.crt`/`server.key` đang có. Các kiểm thử HTTPS từ backend đã PASS theo báo cáo chủ máy. Review và kiểm tra gia hạn theo tài liệu riêng trước khi xác nhận tự gia hạn hoạt động đầy đủ.
+
+```sh
 sudo docker compose --profile https run --rm --no-deps proxy nginx -t
 sudo docker compose --profile https up -d proxy
 ```
 
-Proxy dùng Linux host network để gọi API localhost và listen 443. Kiểm tra xung đột port trước startup. Review security group TCP 443 từ backend và nguồn quản trị thực tế trước khi truy cập. Giữ SSH theo IP quản trị, giữ 2358/5432/6379 ngoài inbound public. Không cần port 80 cho chứng chỉ tự ký. Mọi thay đổi security group cần nằm trong phương án được duyệt.
+Proxy dùng Linux host network để gọi API localhost và listen 443. Kiểm tra xung đột port trước startup. Review security group TCP 443 từ backend và nguồn quản trị thực tế. Giữ SSH theo IP quản trị, giữ 2358/5432/6379 ngoài inbound public. Challenge cho gia hạn cần giữ đường mạng tương ứng với authenticator thực tế. Mọi thay đổi security group cần nằm trong phương án được duyệt.
 
-Chuyển chỉ `server.crt` sang backend qua kênh tin cậy. Đối chiếu fingerprint bằng `openssl x509 -in server.crt -noout -fingerprint -sha256`. Cấu hình HTTP client backend tin cậy certificate này, giữ TLS verification. Private key ở Judge0 host. Chứng chỉ hết hạn sau 30 ngày, cần gia hạn và cập nhật trust. IP đổi cần certificate mới và cập nhật Base URL/trust. Chưa xác minh HTTPS trên EC2.
+Backend dùng system CA trust để xác minh Let's Encrypt và IP SAN. Private key ở Judge0 host. Khi IP đổi cần review certificate và Base URL. Đường dẫn Certbot, deploy hook, timer và lệnh dry-run có trong [hướng dẫn gia hạn](certificate-renewal.md).
 
 ## Kiểm thử thực tế
 
@@ -61,7 +80,7 @@ sudo python3 scripts/smoke.py --config /opt/learnable-judge0/secrets/judge0.conf
 
 Script kiểm tra thiếu/sai token, languages thực tế, accepted, wrong answer, compilation error, timeout, chặn nâng CPU/network, chặn kết nối sandbox tới DB và hai submission gửi đồng thời để kiểm tra queue với một worker. Network probe chỉ mở rồi đóng TCP, không gửi lệnh hoặc đăng nhập DB. Theo dõi `docker stats` và queue khi chạy. Hai job là kiểm thử demo nhỏ, chưa xác định năng lực chịu tải.
 
-Sau cấu hình TLS, chạy lại cùng script thêm `--url https://3.25.120.198 --ca /opt/learnable-judge0/secrets/tls/server.crt` để kiểm tra endpoint integration thật. Script không in secret hoặc source/output job, có in languages và PASS. Batch/callback bị tắt.
+Với Let's Encrypt, chạy lại cùng script thêm `--url https://3.25.120.198`, dùng system CA trust. Script không in secret hoặc source/output job, có in languages và PASS. Polling chỉ yêu cầu `fields=status` để tránh đọc output không cần thiết trước verdict. Batch/callback bị tắt.
 
 ## Điều khiển và giám sát
 

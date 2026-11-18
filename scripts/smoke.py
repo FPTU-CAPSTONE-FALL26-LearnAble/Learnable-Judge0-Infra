@@ -66,7 +66,7 @@ def main():
         require(code == 201 and bool(created.get('token')), name + ' create')
         deadline = time.monotonic() + 90
         while time.monotonic() < deadline:
-            code, result = request('GET', '/submissions/' + created['token'])
+            code, result = request('GET', '/submissions/' + created['token'] + '?fields=status')
             if code != 200:
                 raise RuntimeError(name + ' polling HTTP ' + str(code))
             status = result['status']['id']

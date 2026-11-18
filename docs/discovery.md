@@ -49,3 +49,7 @@ Chủ máy xác nhận đã start lại instance ngày 2026-11-18. Session kiể
 ## Chuẩn bị host qua EC2 Instance Connect
 
 Chủ máy báo Docker 29.10.0, Compose v5.8.0, cgroups v1, Docker/SSH active và hello-world thành công sau reboot. Codex chưa xác minh trực tiếp hoặc kiểm thử Judge0. EC2 Instance Connect trong Console không cấp private key/agent cho cloud session. Architecture, RAM/disk, phiên bản Judge0 hiện có và dữ liệu cần giữ vẫn cần output khảo sát. Chủ máy yêu cầu commit/push bộ triển khai không chứa secret để tiếp tục review và triển khai.
+
+## Chứng chỉ và kiểm thử từ backend theo chủ máy
+
+Chủ máy xác nhận đã có Let's Encrypt IP certificate tại lineage `learnable-judge0-ip` cho 3.25.120.198, expiry được báo 25/11/2026. Proxy dùng bản sao server.crt/server.key trong TLS_DIR. Authenticated languages, accepted, wrong answer, compilation error và time limit đã PASS từ backend qua HTTPS theo báo cáo chủ máy. Timer và renew --dry-run còn cần kiểm tra, Codex chưa xác minh trực tiếp hoặc đọc private key.

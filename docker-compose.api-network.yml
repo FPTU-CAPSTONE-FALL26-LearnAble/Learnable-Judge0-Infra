@@ -1,0 +1,10 @@
+# Explicitly enable with COMPOSE_FILE in .env or with both -f arguments.
+# Attach only the API to a routed bridge, preserving the internal data network.
+services:
+  server:
+    networks: [data, api]
+
+networks:
+  api:
+    driver: bridge
+    internal: false
