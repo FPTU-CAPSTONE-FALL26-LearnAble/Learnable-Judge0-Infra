@@ -1,30 +1,81 @@
-# LearnAble Judge0 infrastructure
+# LearnAble Judge0 Infrastructure
 
-Repository quản lý triển khai Judge0 CE trên EC2 `learnable-judge0-demo`, region `ap-southeast-2`.
+Deployment configuration and operational tooling for the Judge0 CE code execution service used by LearnAble. The stack runs on an existing AWS EC2 instance using Docker Compose and official container images.
 
-Instance ID `i-061bc0f7bc2e1dce2`. Chủ máy xác nhận đã start lại instance ngày 2026-11-18. Chủ máy cung cấp Public IPv4 mới `3.25.120.198`, trạng thái Running. Chủ máy xác nhận status checks 3/3 đạt. Session chưa có quyền truy cập SSH. IP cũ đã hết hiệu lực.
+The LearnAble backend submits programs to Judge0 and polls for execution results. API credentials are managed on the backend, and the frontend communicates through the backend.
 
-Hiện tại đang ở bước khảo sát và review phương án. Chưa đăng nhập được EC2, chưa triển khai Judge0, chưa xác minh dữ liệu hoặc chạy kiểm thử submission.
+## Architecture
 
-- [Phương án cần review](docs/deployment-review.md)
-- [Trạng thái khảo sát](docs/discovery.md)
-- [Khảo sát qua máy quản trị có SSH](docs/ssh-access.md)
-- Script khảo sát chỉ đọc tại `scripts/inspect-host.sh`.
+```text
+LearnAble Backend → HTTPS reverse proxy → Judge0 API
+                                              │
+                                        PostgreSQL / Redis
+                                              │
+                                         Judge0 Worker
+```
 
-Chạy script trên đúng EC2 sau khi xác minh SSH host key bằng nguồn tin cậy. Script không cài đặt hoặc thay đổi dịch vụ. Xem output trước khi chia sẻ vì có thông tin hạ tầng nội bộ.
+| Service | Image version | Role |
+| --- | --- | --- |
+| `server` | Judge0 CE 1.13.1 | Authenticated API for submissions and results |
+| `workers` | Judge0 CE 1.13.1 | Sandboxed compilation and execution |
+| `db` | PostgreSQL 16.16-bookworm | Submission and result storage |
+| `redis` | Redis 7.2.17-bookworm | Job queue with AOF persistence |
+| `proxy` | Nginx 1.30.6 | HTTPS endpoint, enabled through the `https` profile |
+
+Images are pinned by version and SHA-256 digest. The API binds to `127.0.0.1:2358`. PostgreSQL and Redis use an internal Docker network and persistent named volumes. The API and worker use privileged containers as required by the official Judge0 CE 1.13.1 deployment configuration.
+
+## Prerequisites
+
+- An accessible Linux x86-64 host with Docker Engine and Docker Compose.
+- A cgroups v1 configuration compatible with the pinned Judge0 release.
+- Python 3 for configuration generation and smoke checks, plus OpenSSL for demo TLS certificates.
+- Sufficient CPU, memory and disk space for the configured limits, compiler images, submission data and backups.
+
+Inspect the target host before deployment and review existing containers, configuration and volumes. Resource sizing, data preservation and upgrade procedures are covered in the operations guide.
+
+## Getting started
+
+Run these commands from the repository root on the deployment host.
 
 ```sh
 bash scripts/inspect-host.sh
+cp -n .env.example .env
 ```
 
-## Bộ triển khai để review
+Review `.env` and set the host configuration paths, volume names and resource budgets. For an existing installation, identify and back up its data before starting the stack.
 
-Compose pin tag và digest cho Judge0 CE 1.13.1, PostgreSQL 16.16-bookworm, Redis 7.2.17-bookworm và Nginx 1.30.6. Registry xác nhận image Judge0 là amd64. API bind localhost, database/Redis ở mạng internal, Redis có AOF và volume riêng. Một worker xử lý job. Chỉ server và worker privileged theo release.
+For a new installation, generate a configuration file outside the checkout. The generator refuses to overwrite an existing file. UID 1000 is the Judge0 user in the pinned image.
 
-- [Runbook cài mới, HTTPS, kiểm thử và vận hành](docs/operations.md)
-- [Hợp đồng integration cho backend](docs/integration.md)
-- [Các kiểm tra đã chạy và phần còn chờ](docs/validation.md)
+```sh
+sudo python3 scripts/init-config.py /opt/learnable-judge0/secrets/judge0.conf
+sudo chown 1000:1000 /opt/learnable-judge0/secrets/judge0.conf
+sudo bash scripts/preflight.sh
+sudo docker compose pull
+sudo docker compose up -d --wait --wait-timeout 240 db redis server workers
+sudo docker compose ps
+```
 
-Chủ máy báo Docker 29.10.0, Compose v5.8.0, cgroups v1, Docker/SSH active và hello-world thành công sau reboot qua EC2 Instance Connect. Codex chưa xác minh architecture, RAM/disk, dữ liệu hay submission trên EC2.
+Complete the smoke checks in the operations guide to verify authentication, supported languages, execution results and sandbox behavior. Repeat them after service restarts.
 
-HTTPS là profile tùy chọn dùng chứng chỉ IP SAN tự ký cho demo, backend cần trust certificate riêng. Chưa có endpoint HTTPS được nghiệm thu. Chạy preflight và review volume names/tài nguyên trước `up`. Secret thật được tạo ngoài checkout. Wrapper lọc dòng export mà startup upstream có thể in secret ra log.
+## Configuration and security
+
+`.env.example` defines deployment paths, volume names and container resource budgets. `judge0.conf.example` defines authentication, worker settings and execution limits. Real tokens, passwords, private keys and configuration files belong in protected storage outside Git.
+
+The demo configuration uses one worker, a queue limit of 20, a CPU time limit of 2 seconds, a wall time limit of 5 seconds and a memory limit of 128000 KB per submission. Submission networking is disabled. Review these settings against the host capacity and supported languages before deployment.
+
+The optional `https` profile exposes Nginx on port 443 using Linux host networking. Configure its certificate and restrict access to the intended backend and administration sources. For demos without a domain, the repository includes an IP SAN self-signed certificate helper. Backend clients must explicitly trust that certificate and keep TLS verification enabled.
+
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Operations](docs/operations.md) | Installation, secrets, HTTPS, smoke checks, monitoring, backups, retention and rollback |
+| [Backend integration](docs/integration.md) | Authentication, endpoints, submission states, limits and polling |
+| [Deployment review](docs/deployment-review.md) | Release requirements, configuration choices and resource planning |
+| [Validation record](docs/validation.md) | Completed checks and outstanding deployment verification |
+| [Host discovery](docs/discovery.md) | Recorded infrastructure observations |
+| [SSH access](docs/ssh-access.md) | Access requirements and remote inspection |
+
+## Development workflow
+
+Commit and push changes to `dev` for review. The project maintainer merges approved changes into `main`.
