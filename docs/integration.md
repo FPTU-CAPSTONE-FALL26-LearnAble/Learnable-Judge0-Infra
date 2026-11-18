@@ -1,14 +1,14 @@
 # Integration cho Backend LearnAble
 
-Đây là hợp đồng dự kiến theo API v1.13.1. Codex chưa triển khai hoặc kiểm thử Judge0 trên EC2. Cần ghi kết quả nghiệm thu sau khi chạy smoke qua HTTPS thật.
+Hợp đồng theo API v1.13.1. Chủ máy báo HTTPS từ backend đã PASS authenticated languages, accepted, wrong answer, compilation error và time limit. Codex chưa xác minh trực tiếp. Mapping language, restart/network/concurrency và tự gia hạn còn cần kết quả tương ứng.
 
 | Mục | Giá trị / trạng thái |
 | --- | --- |
-| Base URL HTTPS | Chưa xác minh, ứng viên demo https://3.25.120.198 sau cấu hình TLS/trust |
+| Base URL HTTPS | https://3.25.120.198, chủ máy báo đã kiểm thử từ backend |
 | Header xác thực | X-Auth-Token, token cấp riêng qua kênh bảo mật |
 | Language mapping | Chưa xác minh, lấy từ GET /languages và output smoke |
 | Batch/callback | Tắt trong cấu hình demo |
-| TLS trust | Chứng chỉ IP SAN tự ký, backend cần trust riêng |
+| TLS trust | Let's Encrypt IP SAN, backend dùng system CA trust |
 
 Backend EC2 gọi Judge0, frontend gọi backend. Token ở secret/config backend và chỉ gửi bằng header. AUTHZ_TOKEN dành cho quản trị, không cần để tạo submission và lấy kết quả.
 
@@ -26,7 +26,7 @@ POST `/submissions?base64_encoded=true&wait=false` nhận JSON dưới đây. Th
 }
 ```
 
-HTTP 201 theo hợp đồng có response `{ "token": "<submission-id>" }`. Poll GET `/submissions/<submission-id>?base64_encoded=true&fields=token,status,stdout,stderr,compile_output,time,memory,message,exit_code,exit_signal`. Thêm header X-Auth-Token trong mọi request, không đặt token trong URL. Với base64_encoded=true, backend decode các trường source/input/output tương ứng.
+HTTP 201 có response `{ "token": "<submission-id>" }`. Poll GET `/submissions/<submission-id>?fields=status`. Khi status kết thúc, lấy kết quả qua GET `/submissions/<submission-id>?base64_encoded=true&fields=token,status,stdout,stderr,compile_output,time,memory,message,exit_code,exit_signal`. Thêm header X-Auth-Token trong mọi request, không đặt token trong URL. Với base64_encoded=true, backend decode các trường source/input/output tương ứng.
 
 Ví dụ response accepted theo hợp đồng gồm `status.id=3`, `stdout="NDIK"`, `stderr=null`. time/memory lấy từ kết quả thật. Đây chưa phải response đã quan sát trên EC2.
 

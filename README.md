@@ -63,7 +63,9 @@ Complete the smoke checks in the operations guide to verify authentication, supp
 
 The demo configuration uses one worker, a queue limit of 20, a CPU time limit of 2 seconds, a wall time limit of 5 seconds and a memory limit of 128000 KB per submission. Submission networking is disabled. Review these settings against the host capacity and supported languages before deployment.
 
-The optional `https` profile exposes Nginx on port 443 using Linux host networking. Configure its certificate and restrict access to the intended backend and administration sources. For demos without a domain, the repository includes an IP SAN self-signed certificate helper. Backend clients must explicitly trust that certificate and keep TLS verification enabled.
+The optional `https` profile exposes Nginx on port 443 using Linux host networking. Configure its certificate and restrict access to the intended backend and administration sources. The deployment uses a Let's Encrypt IP certificate with system CA trust. Certificate deployment and scheduled renewal are described in the renewal guide.
+
+For deployments requiring a routed API bridge, enable `docker-compose.api-network.yml` through `COMPOSE_FILE` in `.env`. It attaches the API to an additional bridge while retaining the internal data network, localhost port binding and worker sandbox policy.
 
 ## Documentation
 
@@ -71,6 +73,7 @@ The optional `https` profile exposes Nginx on port 443 using Linux host networki
 | --- | --- |
 | [Operations](docs/operations.md) | Installation, secrets, HTTPS, smoke checks, monitoring, backups, retention and rollback |
 | [Backend integration](docs/integration.md) | Authentication, endpoints, submission states, limits and polling |
+| [Certificate renewal](docs/certificate-renewal.md) | Existing Let's Encrypt certificate, deploy hook, timer and renewal checks |
 | [Deployment review](docs/deployment-review.md) | Release requirements, configuration choices and resource planning |
 | [Validation record](docs/validation.md) | Completed checks and outstanding deployment verification |
 | [Host discovery](docs/discovery.md) | Recorded infrastructure observations |

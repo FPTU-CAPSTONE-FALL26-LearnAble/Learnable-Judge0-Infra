@@ -1,0 +1,5 @@
+# Install as /etc/learnable-judge0/renewal.conf, root-owned with mode 0600.
+# Set the actual existing checkout path on EC2.
+REPO_DIR=/absolute/path/to/learnable-judge0-infra
+TLS_DIR=/opt/learnable-judge0/secrets/tls
+CERTIFICATE_IP=3.25.120.198
